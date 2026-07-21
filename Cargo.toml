@@ -1,0 +1,19 @@
+[package]
+name = "ccd"
+version = "0.1.0"
+edition = "2021"
+description = "Correcting cd: typo/abbreviation-tolerant directory jumping that learns from your history"
+license = "MIT"
+
+[[bin]]
+name = "ccd"
+path = "src/bin/ccd.rs"
+
+# std-only, no dependencies by design (single fast binary, like zoxide)
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
