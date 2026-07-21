@@ -4,13 +4,14 @@ Correcting `cd`: typo- and abbreviation-tolerant directory jumping that learns
 from your shell history.
 
 ```sh
-cd Dwn        # ~/Downloads
-cd Doanloads  # ~/Downloads
-cd wn         # ~/dev/web-node
+ccd Dwn         # jumps to ~/Downloads
+ccd Dco<Tab>    # shows options
+ccd Dco<Tab><Tab>
+                # selects the first option; Tab again cycles
 ```
 
-`ccd` never replaces normal `cd` behavior. The shell hook tries the real `cd`
-first and only asks `ccd` for a match when the path does not exist.
+Normal `cd` is never overridden. `ccd` is a separate shell function so it can
+change the current shell directory.
 
 ## Install
 
@@ -22,6 +23,7 @@ ccd seed --dry-run --list
 ccd seed
 
 echo 'eval "$(ccd init zsh)"' >> ~/.zshrc
+exec zsh
 ```
 
 Use `ccd init bash` for Bash or `ccd init fish | source` for Fish.

@@ -16,7 +16,7 @@ use std::path::Path;
 use std::process::exit;
 
 use config::Config;
-use store::{now, Store};
+use store::{now, Entry, Store};
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -100,10 +100,19 @@ fn cmd_query(args: &[String]) {
         .map(|(_, v)| canonical_dir_or_input(v))
         .unwrap_or_default();
     let list = flags.iter().any(|(k, _)| k == "list");
+    let complete = flags.iter().any(|(k, _)| k == "complete");
 
-    let cfg = Config::frozen();
-    let store = Store::load();
-    let ranked = rank::rank(fragment, &cwd, &store, &cfg, now());
+    let mut cfg = Config::frozen();
+    if complete {
+        cfg.min_match = 0.50;
+        cfg.child_margin = 0.20;
+    }
+    let t = now();
+    let mut store = Store::load();
+    if complete {
+        add_completion_dirs(&mut store, &cwd, t);
+    }
+    let ranked = rank::rank(fragment, &cwd, &store, &cfg, t);
 
     if list {
         for c in &ranked {
@@ -245,6 +254,30 @@ fn canonical_dir_or_input(path: &str) -> String {
         .filter(|p| p.is_dir())
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_string())
+}
+
+fn add_completion_dirs(store: &mut Store, cwd: &str, t: u64) {
+    let Ok(rd) = std::fs::read_dir(cwd) else {
+        return;
+    };
+    for ent in rd.flatten() {
+        let Ok(ft) = ent.file_type() else { continue };
+        if !ft.is_dir() {
+            continue;
+        }
+        let name = ent.file_name();
+        if name.to_string_lossy().starts_with('.') {
+            continue;
+        }
+        let Ok(canon) = std::fs::canonicalize(ent.path()) else {
+            continue;
+        };
+        let path = canon.to_string_lossy().into_owned();
+        store.map.entry(path).or_insert(Entry {
+            score: 2.0,
+            last: t,
+        });
+    }
 }
 
 fn ensure_locked(store: &Store) {

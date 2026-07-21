@@ -36,18 +36,34 @@ print "   DB now has $(wc -l < "$CCD_DB" | tr -d ' ') dirs"
 
 print "\n== 2. enable shell integration (non-interactive) =="
 eval "$(ccd init zsh)"
-whence -w cd | grep -q function && pass "cd override installed" || bad "cd override missing"
+whence -w cd | grep -q builtin && pass "native cd remains builtin" || bad "native cd was modified"
+whence -w ccd | grep -q function && pass "ccd jump function installed" || bad "ccd jump function missing"
 
 print "\n== 3. behavior tests =="
 
+builtin cd $HOME; ccd Dwn 2>/dev/null
+check "ccd Dwn (explicit jump) -> Downloads" "$HOME/Downloads" "$PWD"
+
+builtin cd $HOME; ccd "$HOME/Documents" 2>/dev/null
+check "ccd selected absolute path -> Documents" "$HOME/Documents" "$PWD"
+
+builtin cd $HOME; ccd Doanloads 2>/dev/null
+check "ccd Doanloads (typo) -> Downloads" "$HOME/Downloads" "$PWD"
+
+builtin cd $HOME; ccd documnets 2>/dev/null
+check "ccd documnets (typo) -> Documents" "$HOME/Documents" "$PWD"
+
+q=$(ccd query Dwn --cwd $HOME)
+check "ccd query still reaches binary" "$HOME/Downloads" "$q"
+
 builtin cd $HOME; cd Dwn 2>/dev/null
-check "cd Dwn (abbrev) -> Downloads" "$HOME/Downloads" "$PWD"
+check "cd Dwn stays native and does not jump" "$HOME" "$PWD"
 
 builtin cd $HOME; cd Doanloads 2>/dev/null
-check "cd Doanloads (typo) -> Downloads" "$HOME/Downloads" "$PWD"
+check "cd Doanloads stays native and does not jump" "$HOME" "$PWD"
 
 builtin cd $HOME; cd documnets 2>/dev/null
-check "cd documnets (transpose) -> Documents" "$HOME/Documents" "$PWD"
+check "cd documnets stays native and does not jump" "$HOME" "$PWD"
 
 # native behavior must be untouched: real paths work exactly as before
 builtin cd $HOME; cd /tmp

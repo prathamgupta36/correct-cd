@@ -83,7 +83,7 @@ pub fn subseq_score(q: &str, base: &str, cfg: &Config) -> f64 {
             at_boundary += 1;
         }
     }
-    if at_boundary > 0 {
+    if at_boundary > 1 {
         score += cfg.boundary_base + cfg.acronym_scale * (at_boundary as f64 / m);
     }
     score.clamp(0.0, 1.0)
@@ -98,8 +98,32 @@ pub fn edit_score(q: &str, base: &str) -> f64 {
     1.0 - d as f64 / denom
 }
 
+/// Strong signal for short typos in the beginning of a directory name:
+/// `Dco` should rank as `Documents`, not an interior subsequence elsewhere.
+pub fn prefix_edit_score(q: &str, base: &str) -> f64 {
+    let ql: Vec<char> = q.to_lowercase().chars().collect();
+    let bl: Vec<char> = base.to_lowercase().chars().collect();
+    if ql.is_empty() || bl.is_empty() {
+        return 0.0;
+    }
+
+    let prefix_len = ql.len().min(bl.len());
+    let prefix = &bl[..prefix_len];
+    let d = osa_distance(&ql, prefix);
+    if d == 0 {
+        return 1.0;
+    }
+    if d == 1 && ql.len() <= 4 {
+        return 0.94;
+    }
+    let denom = ql.len().max(prefix.len()).max(1) as f64;
+    (1.0 - d as f64 / denom).clamp(0.0, 1.0)
+}
+
 pub fn fuzzy_score(q: &str, base: &str, cfg: &Config) -> f64 {
-    subseq_score(q, base, cfg).max(edit_score(q, base))
+    subseq_score(q, base, cfg)
+        .max(edit_score(q, base))
+        .max(prefix_edit_score(q, base))
 }
 
 #[cfg(test)]
@@ -124,5 +148,11 @@ mod tests {
     fn fuzzy_accepts_typo() {
         let cfg = Config::frozen();
         assert!(fuzzy_score("documnets", "Documents", &cfg) >= cfg.min_match);
+    }
+
+    #[test]
+    fn prefix_typo_beats_interior_subsequence() {
+        let cfg = Config::frozen();
+        assert!(fuzzy_score("Dco", "Documents", &cfg) > fuzzy_score("Dco", "defconquals", &cfg));
     }
 }
